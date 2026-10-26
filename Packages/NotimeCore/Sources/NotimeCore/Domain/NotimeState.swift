@@ -69,16 +69,17 @@ public struct NotimeState: Codable, Hashable, Sendable {
 
     // MARK: Mutations
 
-    /// Counts a shield shown on `now`'s day and remembers when, per target.
+    /// Counts a shield shown in `now`'s day and hour and remembers when, per target.
     public mutating func recordShieldImpression(for target: BlockedTarget?, at now: Date, calendar: Calendar) {
-        recordShieldImpression(for: target, on: DayKey(now, calendar: calendar))
+        recordShieldImpression(for: target, on: DayKey(now, calendar: calendar), hour: calendar.component(.hour, from: now))
         if let target {
             lastImpressionAt[target] = max(lastImpressionAt[target] ?? now, now)
         }
     }
 
-    public mutating func recordShieldImpression(for target: BlockedTarget?, on day: DayKey) {
-        updateLedger(for: day) { $0.recordShieldImpression(for: target) }
+    /// `hour` is the local hour of day, or nil when it is unknown.
+    public mutating func recordShieldImpression(for target: BlockedTarget?, on day: DayKey, hour: Int?) {
+        updateLedger(for: day) { $0.recordShieldImpression(for: target, hour: hour) }
     }
 
     /// Opens `target` for `minutes`. Returns nil (and changes nothing) while it is already open.
@@ -90,7 +91,8 @@ public struct NotimeState: Codable, Hashable, Sendable {
         activityName: String
     ) -> AccessGrant? {
         guard activeGrant(for: target, at: now) == nil else { return nil }
-        updateLedger(for: DayKey(now, calendar: calendar)) { $0.recordAccessGranted(for: target) }
+        let hour = calendar.component(.hour, from: now)
+        updateLedger(for: DayKey(now, calendar: calendar)) { $0.recordAccessGranted(for: target, hour: hour) }
         let grant = AccessGrant(
             target: target,
             grantedAt: now,
@@ -112,7 +114,8 @@ public struct NotimeState: Codable, Hashable, Sendable {
     public mutating func revokeGrant(_ grant: AccessGrant, calendar: Calendar) {
         guard grants.contains(grant) else { return }
         grants.removeAll { $0 == grant }
-        updateLedger(for: DayKey(grant.grantedAt, calendar: calendar)) { $0.undoAccessGranted(for: grant.target) }
+        let hour = calendar.component(.hour, from: grant.grantedAt)
+        updateLedger(for: DayKey(grant.grantedAt, calendar: calendar)) { $0.undoAccessGranted(for: grant.target, hour: hour) }
     }
 
     /// Drops ledgers older than the last `dayCount` days (today included).

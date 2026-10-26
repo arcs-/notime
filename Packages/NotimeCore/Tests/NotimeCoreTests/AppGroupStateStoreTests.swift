@@ -33,7 +33,7 @@ final class AppGroupStateStoreTests: XCTestCase {
         state.lastImpressionAt[TestFixtures.site] = now
         state.waitsToOpen = [WaitingToOpen(target: TestFixtures.app, startedAt: now, seconds: 40)]
         _ = state.grantAccess(to: TestFixtures.app, minutes: 5, now: now, calendar: TestFixtures.calendar, activityName: "grant-x")
-        state.recordShieldImpression(for: TestFixtures.site, on: DayKey(now, calendar: TestFixtures.calendar))
+        state.recordShieldImpression(for: TestFixtures.site, on: DayKey(now, calendar: TestFixtures.calendar), hour: nil)
 
         XCTAssertNotNil(store.modify { $0 = state })
 
@@ -156,7 +156,7 @@ final class AppGroupStateStoreTests: XCTestCase {
         DispatchQueue.concurrentPerform(iterations: 64) { _ in
             // A separate store value per thread, like separate processes, sharing only the files.
             let independentStore = AppGroupStateStore(directory: store.directory, role: .app)
-            _ = independentStore.modify { $0.recordShieldImpression(for: nil, on: day) }
+            _ = independentStore.modify { $0.recordShieldImpression(for: nil, on: day, hour: nil) }
         }
         XCTAssertEqual(store.load().loadedValue?.ledger(for: day).totals.shieldImpressions, 64)
     }

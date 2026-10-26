@@ -6,17 +6,22 @@ public struct UsageReport: Hashable, Sendable {
     public let statisticsByTarget: [BlockedTarget: BlockStatistics]
     public let targetsByImpressions: [BlockedTarget]
 
-    /// Shields shown per day for the `dayCount` days ending today, oldest first, zeros included.
-    public static func dailyShieldImpressions(
+    /// Counts per local hour of `ledger`'s day, hours 0 through 23, zeros included.
+    public static func hourlyStatistics(for ledger: DailyUsageLedger?) -> [(hour: Int, statistics: BlockStatistics)] {
+        (0..<24).map { hour in (hour, ledger?.statisticsByHour[hour] ?? BlockStatistics()) }
+    }
+
+    /// Counts per day for the `dayCount` days ending today, oldest first, zeros included.
+    public static func dailyStatistics(
         ledgers: [DailyUsageLedger],
         dayCount: Int,
         today: DayKey,
         calendar: Calendar
-    ) -> [(day: DayKey, shieldImpressions: Int)] {
-        let byDay = Dictionary(ledgers.map { ($0.day, $0.totals.shieldImpressions) }, uniquingKeysWith: +)
+    ) -> [(day: DayKey, statistics: BlockStatistics)] {
+        let byDay = Dictionary(ledgers.map { ($0.day, $0.totals) }, uniquingKeysWith: +)
         return (0..<dayCount).reversed().map { offset in
             let day = today.adding(days: -offset, calendar: calendar)
-            return (day, byDay[day] ?? 0)
+            return (day, byDay[day] ?? BlockStatistics())
         }
     }
 

@@ -195,11 +195,11 @@ final class NotimeServiceTests: XCTestCase {
     func testShieldShowsTodaysOpeningsAndCountsImpressions() {
         XCTAssertEqual(
             service(at: now).prepareShield(for: TestFixtures.app),
-            ShieldPresentation(body: "Blocked. Opened 0× today.", buttonTitle: "Open for 1 min")
+            ShieldPresentation(body: "Nothing better to do?", buttonTitle: "Open for 1 min")
         )
         XCTAssertEqual(service(at: now + 10).grantAccess(to: TestFixtures.app), .granted)
         _ = service(at: now + 2 * 60).reconcile()
-        XCTAssertEqual(service(at: now + 2 * 60).prepareShield(for: TestFixtures.app).body, "Blocked. Opened 1× today.")
+        XCTAssertEqual(service(at: now + 2 * 60).prepareShield(for: TestFixtures.app).body, "Nothing better to do? Opened 1× today.")
         XCTAssertEqual(service(at: now + 2 * 60).prepareShield(for: nil), .closeOnly)
         XCTAssertEqual(todaysLedger?.totals.shieldImpressions, 3, "the tap 10 s after a counted shield adds nothing")
     }
@@ -338,7 +338,7 @@ final class NotimeServiceTests: XCTestCase {
             shields: shields, scheduler: scheduler, clock: FixedClock(date: now), calendar: calendar,
             sideEffectsFallback: fallback
         )
-        XCTAssertEqual(extensionService.prepareShield(for: TestFixtures.app).body, "Blocked. Opened 0× today.")
+        XCTAssertEqual(extensionService.prepareShield(for: TestFixtures.app).body, "Nothing better to do?")
 
         try FileManager.default.removeItem(at: lockURL)
         let appService = NotimeService(
@@ -365,7 +365,22 @@ final class NotimeServiceTests: XCTestCase {
         XCTAssertEqual(keys.count, 3)
         XCTAssertEqual(state.ledger(for: today).totals.shieldImpressions, 3)
         XCTAssertEqual(state.ledger(for: today).statisticsByTarget[TestFixtures.site]?.shieldImpressions, 2)
+        XCTAssertEqual(state.ledger(for: today).statisticsByHour, [10: BlockStatistics(shieldImpressions: 3)])
         XCTAssertEqual(state.lastImpressionAt[TestFixtures.site], now + 5)
+    }
+
+    func testFoldingAKeyWithoutAnHourCountsInTheDayOnly() {
+        let defaults = TestFixtures.temporaryDefaults()
+        defaults.set(2, forKey: "impressions.2026-10-25.none")
+        defaults.set(1, forKey: "impressions.2026-10-25-23.none")
+
+        var state = NotimeState()
+        let keys = ShieldSideEffectsFallback(defaults: defaults).fold(into: &state)
+
+        let ledger = state.ledger(for: DayKey(year: 2026, month: 10, day: 25))
+        XCTAssertEqual(keys.count, 2)
+        XCTAssertEqual(ledger.totals.shieldImpressions, 3)
+        XCTAssertEqual(ledger.statisticsByHour, [23: BlockStatistics(shieldImpressions: 1)])
     }
 
     private func shieldWithoutState(_ body: String) -> ShieldPresentation {
@@ -392,28 +407,59 @@ final class NotimeServiceTests: XCTestCase {
         XCTAssertEqual(report.totals.shieldImpressions, 2)
     }
 
-    func testDailySeriesCoversEveryDayEndingTodayWithZeros() {
+    func testDailyStatisticsCoverEveryDayEndingTodayOldestFirstWithZeros() {
         let today = DayKey(now, calendar: calendar)
         var state = NotimeState()
-        state.recordShieldImpression(for: TestFixtures.app, on: today)
-        state.recordShieldImpression(for: TestFixtures.app, on: today)
-        state.recordShieldImpression(for: nil, on: today.adding(days: -2, calendar: calendar))
-        state.recordShieldImpression(for: nil, on: today.adding(days: -9, calendar: calendar))
+        state.recordShieldImpression(for: TestFixtures.app, on: today, hour: nil)
+        state.recordShieldImpression(for: TestFixtures.app, on: today, hour: nil)
+        _ = state.grantAccess(to: TestFixtures.app, minutes: 1, now: now, calendar: calendar, activityName: "grant-a")
+        state.recordShieldImpression(for: nil, on: today.adding(days: -2, calendar: calendar), hour: nil)
+        state.recordShieldImpression(for: nil, on: today.adding(days: -9, calendar: calendar), hour: nil)
 
-        let series = UsageReport.dailyShieldImpressions(ledgers: state.ledgers, dayCount: 7, today: today, calendar: calendar)
+        let series = UsageReport.dailyStatistics(ledgers: state.ledgers, dayCount: 7, today: today, calendar: calendar)
         XCTAssertEqual(series.map(\.day), (0..<7).reversed().map { today.adding(days: -$0, calendar: calendar) })
-        XCTAssertEqual(series.map(\.shieldImpressions), [0, 0, 0, 0, 1, 0, 2])
-        XCTAssertEqual(StatisticsPeriod.allTime.chartDayCount, 30)
+        XCTAssertEqual(series.map(\.statistics.shieldImpressions), [0, 0, 0, 0, 1, 0, 2])
+        XCTAssertEqual(series.map(\.statistics.accessesGranted), [0, 0, 0, 0, 0, 0, 1])
+        XCTAssertEqual(UsageReport.dailyStatistics(ledgers: [], dayCount: 30, today: today, calendar: calendar).count, 30)
+        XCTAssertEqual(StatisticsPeriod.today.chartSpan, .hoursOfToday)
+        XCTAssertEqual(StatisticsPeriod.lastSevenDays.chartSpan, .days(7))
+        XCTAssertEqual(StatisticsPeriod.allTime.chartSpan, .days(30))
+    }
+
+    func testHourlyStatisticsCoverEveryHourOfTheDayWithZeros() {
+        var ledger = DailyUsageLedger(day: DayKey(now, calendar: calendar))
+        ledger.recordShieldImpression(for: TestFixtures.app, hour: 0)
+        ledger.recordShieldImpression(for: nil, hour: 23)
+        ledger.recordShieldImpression(for: nil, hour: nil)
+        ledger.recordAccessGranted(for: TestFixtures.app, hour: 23)
+
+        let series = UsageReport.hourlyStatistics(for: ledger)
+        XCTAssertEqual(series.map(\.hour), Array(0..<24))
+        XCTAssertEqual(series.first?.statistics, BlockStatistics(shieldImpressions: 1, accessesGranted: 0))
+        XCTAssertEqual(series.last?.statistics, BlockStatistics(shieldImpressions: 1, accessesGranted: 1))
+        XCTAssertEqual(series.dropFirst().dropLast().map(\.statistics), Array(repeating: BlockStatistics(), count: 22))
+        XCTAssertEqual(UsageReport.hourlyStatistics(for: nil).map(\.statistics), Array(repeating: BlockStatistics(), count: 24))
+    }
+
+    func testImpressionsAndOpeningsLandInTheirLocalHour() {
+        let afternoon = TestFixtures.date(year: 2026, month: 10, day: 25, hour: 15, minute: 30)
+        XCTAssertEqual(service(at: now).grantAccess(to: TestFixtures.app), .granted)
+        _ = service(at: afternoon).prepareShield(for: TestFixtures.site)
+
+        let hours = todaysLedger?.statisticsByHour
+        XCTAssertEqual(hours?[10], BlockStatistics(shieldImpressions: 1, accessesGranted: 1), "the tap counts the shield and the opening at 10:00")
+        XCTAssertEqual(hours?[15], BlockStatistics(shieldImpressions: 1, accessesGranted: 0))
+        XCTAssertEqual(hours?.count, 2)
     }
 
     func testUsageReportRanksTargetsByImpressions() {
         var state = NotimeState()
         let today = DayKey(now, calendar: calendar)
-        state.recordShieldImpression(for: TestFixtures.app, on: today)
-        state.recordShieldImpression(for: TestFixtures.site, on: today)
-        state.recordShieldImpression(for: TestFixtures.site, on: today.adding(days: -3, calendar: calendar))
-        state.recordShieldImpression(for: TestFixtures.app, on: today.adding(days: -30, calendar: calendar))
-        state.recordShieldImpression(for: TestFixtures.app, on: today.adding(days: -31, calendar: calendar))
+        state.recordShieldImpression(for: TestFixtures.app, on: today, hour: nil)
+        state.recordShieldImpression(for: TestFixtures.site, on: today, hour: nil)
+        state.recordShieldImpression(for: TestFixtures.site, on: today.adding(days: -3, calendar: calendar), hour: nil)
+        state.recordShieldImpression(for: TestFixtures.app, on: today.adding(days: -30, calendar: calendar), hour: nil)
+        state.recordShieldImpression(for: TestFixtures.app, on: today.adding(days: -31, calendar: calendar), hour: nil)
 
         let week = UsageReport(ledgers: state.ledgers, period: .lastSevenDays, today: today, calendar: calendar)
         XCTAssertEqual(week.totals.shieldImpressions, 3)
@@ -529,7 +575,7 @@ final class NotimeServiceTests: XCTestCase {
         let today = DayKey(now, calendar: calendar)
         _ = store.modify { state in
             for offset in 0..<20 {
-                state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar))
+                state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar), hour: nil)
             }
         }
         let extensionStore = AppGroupStateStore(directory: directory, role: .appExtension)

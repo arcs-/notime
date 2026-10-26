@@ -85,7 +85,7 @@ final class StateReconcilerTests: XCTestCase {
         var state = NotimeState()
         let today = DayKey(now, calendar: calendar)
         for offset in [0, -89, -90, -200] {
-            state.recordShieldImpression(for: nil, on: today.adding(days: offset, calendar: calendar))
+            state.recordShieldImpression(for: nil, on: today.adding(days: offset, calendar: calendar), hour: nil)
         }
 
         let result = StateReconciler.reconcile(state, now: now, calendar: calendar, monitoredActivityNames: [])

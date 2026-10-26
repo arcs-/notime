@@ -12,11 +12,28 @@ public struct DailyUsageLedger: Codable, Hashable, Sendable {
     public let day: DayKey
     public private(set) var totals: BlockStatistics
     public private(set) var statisticsByTarget: [BlockedTarget: BlockStatistics]
+    /// Keyed by the local hour of day (0...23) the count was recorded in. Counts recorded
+    /// without an hour (older files, older fallback entries) are only in the totals.
+    public private(set) var statisticsByHour: [Int: BlockStatistics]
 
     public init(day: DayKey) {
         self.day = day
         self.totals = BlockStatistics()
         self.statisticsByTarget = [:]
+        self.statisticsByHour = [:]
+    }
+
+    /// Files written before hours were counted have no `statisticsByHour`.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decode(DayKey.self, forKey: .day)
+        totals = try container.decode(BlockStatistics.self, forKey: .totals)
+        statisticsByTarget = try container.decode([BlockedTarget: BlockStatistics].self, forKey: .statisticsByTarget)
+        statisticsByHour = try container.decodeIfPresent([Int: BlockStatistics].self, forKey: .statisticsByHour) ?? [:]
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case day, totals, statisticsByTarget, statisticsByHour
     }
 
     /// The oldest day still kept when today is `today` and `dayCount` days are kept.
@@ -29,6 +46,7 @@ public struct DailyUsageLedger: Codable, Hashable, Sendable {
         guard other.day == day else { return }
         totals = totals + other.totals
         statisticsByTarget.merge(other.statisticsByTarget, uniquingKeysWith: +)
+        statisticsByHour.merge(other.statisticsByHour, uniquingKeysWith: +)
     }
 
     /// Accesses granted to `target` on this day; drives the growing wait.
@@ -36,26 +54,34 @@ public struct DailyUsageLedger: Codable, Hashable, Sendable {
         statisticsByTarget[target]?.accessesGranted ?? 0
     }
 
-    /// `target` is nil when the shield was for a category or a token-less item.
-    public mutating func recordShieldImpression(for target: BlockedTarget?) {
+    /// `target` is nil when the shield was for a category or a token-less item; `hour` is nil
+    /// only for counts whose hour is unknown.
+    public mutating func recordShieldImpression(for target: BlockedTarget?, hour: Int?) {
         totals.shieldImpressions += 1
         if let target {
             statisticsByTarget[target, default: BlockStatistics()].shieldImpressions += 1
+        }
+        if let hour {
+            statisticsByHour[hour, default: BlockStatistics()].shieldImpressions += 1
         }
     }
 
     /// Returns the new access count for `target`.
     @discardableResult
-    public mutating func recordAccessGranted(for target: BlockedTarget) -> Int {
+    public mutating func recordAccessGranted(for target: BlockedTarget, hour: Int) -> Int {
         totals.accessesGranted += 1
         statisticsByTarget[target, default: BlockStatistics()].accessesGranted += 1
+        statisticsByHour[hour, default: BlockStatistics()].accessesGranted += 1
         return accessCount(for: target)
     }
 
     /// Reverts `recordAccessGranted` for a grant that could not be monitored.
-    public mutating func undoAccessGranted(for target: BlockedTarget) {
+    public mutating func undoAccessGranted(for target: BlockedTarget, hour: Int) {
         guard accessCount(for: target) > 0 else { return }
         totals.accessesGranted -= 1
         statisticsByTarget[target, default: BlockStatistics()].accessesGranted -= 1
+        if let accesses = statisticsByHour[hour]?.accessesGranted, accesses > 0 {
+            statisticsByHour[hour]?.accessesGranted -= 1
+        }
     }
 }

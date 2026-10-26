@@ -6,8 +6,10 @@ import Foundation
 /// on our behalf, so it works where direct file writes are denied. Processes that can write
 /// the state file fold these entries in and clear them.
 ///
-/// Keys: `impressions.<y-m-d>.<targetKey>` (a count) and `lastImpression.<targetKey>` (a date). `targetKey` is the base64 of the encoded target, or
-/// `none` for category and token-less shields.
+/// Keys: `impressions.<y-m-d-h>.<targetKey>` (a count; `h` is the local hour of day) and
+/// `lastImpression.<targetKey>` (a date). `targetKey` is the base64 of the encoded target, or
+/// `none` for category and token-less shields. Keys written before hours were counted are
+/// `impressions.<y-m-d>.<targetKey>`; they count in the day only.
 public struct ShieldSideEffectsFallback: @unchecked Sendable {
     static let impressionPrefix = "impressions."
     static let lastImpressionPrefix = "lastImpression."
@@ -25,9 +27,10 @@ public struct ShieldSideEffectsFallback: @unchecked Sendable {
 
     public func recordShieldImpression(for target: BlockedTarget?, at date: Date, calendar: Calendar) {
         let day = DayKey(date, calendar: calendar)
+        let hour = calendar.component(.hour, from: date)
         guard let defaults else { return }
         let targetKey = target.flatMap(Self.key) ?? Self.noTargetKey
-        let impressionKey = "\(Self.impressionPrefix)\(day.year)-\(day.month)-\(day.day).\(targetKey)"
+        let impressionKey = "\(Self.impressionPrefix)\(day.year)-\(day.month)-\(day.day)-\(hour).\(targetKey)"
         defaults.set(defaults.integer(forKey: impressionKey) + 1, forKey: impressionKey)
         if target != nil {
             defaults.set(date, forKey: Self.lastImpressionPrefix + targetKey)
@@ -58,13 +61,14 @@ public struct ShieldSideEffectsFallback: @unchecked Sendable {
 
     private func foldImpressions(key: String, value: Any, into state: inout NotimeState) {
         let parts = key.dropFirst(Self.impressionPrefix.count).split(separator: ".", maxSplits: 1)
-        let dayParts = parts.first?.split(separator: "-").compactMap { Int($0) } ?? []
-        guard parts.count == 2, dayParts.count == 3, let count = value as? Int else { return }
-        let day = DayKey(year: dayParts[0], month: dayParts[1], day: dayParts[2])
+        let timeParts = parts.first?.split(separator: "-").compactMap { Int($0) } ?? []
+        guard parts.count == 2, timeParts.count == 3 || timeParts.count == 4, let count = value as? Int else { return }
+        let day = DayKey(year: timeParts[0], month: timeParts[1], day: timeParts[2])
+        let hour = timeParts.count == 4 ? timeParts[3] : nil
         let target = Self.target(forKey: String(parts[1]))
         guard target != nil || parts[1] == Self.noTargetKey else { return }
         for _ in 0..<max(count, 0) {
-            state.recordShieldImpression(for: target, on: day)
+            state.recordShieldImpression(for: target, on: day, hour: hour)
         }
     }
 

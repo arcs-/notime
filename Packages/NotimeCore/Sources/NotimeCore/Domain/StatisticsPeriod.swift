@@ -13,12 +13,19 @@ public enum StatisticsPeriod: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Days in the chart. Counts are kept per day, so "Today" shows the last 7 days too.
-    public var chartDayCount: Int {
+    /// What the chart shows: today by hour, or the last few days by day. "All time" charts the
+    /// last 30 days; its totals cover every day kept.
+    public var chartSpan: ChartSpan {
         switch self {
-        case .today, .lastSevenDays: 7
-        case .allTime: 30
+        case .today: .hoursOfToday
+        case .lastSevenDays: .days(7)
+        case .allTime: .days(30)
         }
+    }
+
+    public enum ChartSpan: Hashable, Sendable {
+        case hoursOfToday
+        case days(Int)
     }
 
     public func includes(_ day: DayKey, today: DayKey, calendar: Calendar) -> Bool {

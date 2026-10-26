@@ -8,19 +8,22 @@ final class DailyUsageLedgerTests: XCTestCase {
 
     func testCountsImpressionsAndAccessesPerTargetAndInTotal() {
         var ledger = DailyUsageLedger(day: DayKey(year: 2026, month: 10, day: 25))
-        ledger.recordShieldImpression(for: TestFixtures.app)
-        ledger.recordShieldImpression(for: TestFixtures.app)
-        ledger.recordShieldImpression(for: nil)
-        XCTAssertEqual(ledger.recordAccessGranted(for: TestFixtures.app), 1)
-        XCTAssertEqual(ledger.recordAccessGranted(for: TestFixtures.app), 2)
+        ledger.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        ledger.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        ledger.recordShieldImpression(for: nil, hour: 9)
+        XCTAssertEqual(ledger.recordAccessGranted(for: TestFixtures.app, hour: 9), 1)
+        XCTAssertEqual(ledger.recordAccessGranted(for: TestFixtures.app, hour: 9), 2)
 
         XCTAssertEqual(ledger.totals, BlockStatistics(shieldImpressions: 3, accessesGranted: 2))
         XCTAssertEqual(ledger.statisticsByTarget[TestFixtures.app], BlockStatistics(shieldImpressions: 2, accessesGranted: 2))
         XCTAssertEqual(ledger.accessCount(for: TestFixtures.site), 0)
 
-        ledger.undoAccessGranted(for: TestFixtures.app)
+        XCTAssertEqual(ledger.statisticsByHour, [9: BlockStatistics(shieldImpressions: 3, accessesGranted: 2)])
+
+        ledger.undoAccessGranted(for: TestFixtures.app, hour: 9)
         XCTAssertEqual(ledger.accessCount(for: TestFixtures.app), 1)
         XCTAssertEqual(ledger.totals.accessesGranted, 1)
+        XCTAssertEqual(ledger.statisticsByHour[9]?.accessesGranted, 1)
     }
 
     func testDayKeyRollsOverAtLocalMidnight() {
@@ -58,7 +61,7 @@ final class DailyUsageLedgerTests: XCTestCase {
         var state = NotimeState()
         let today = DayKey(year: 2026, month: 10, day: 25)
         for offset in 0..<120 {
-            state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar))
+            state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar), hour: nil)
         }
         state.pruneLedgers(today: today, calendar: calendar)
         XCTAssertEqual(state.ledgers.count, 90)
@@ -69,12 +72,12 @@ final class DailyUsageLedgerTests: XCTestCase {
     func testAddSumsTotalsAndPerTargetCountsOfTheSameDayOnly() {
         let day = DayKey(year: 2026, month: 10, day: 24)
         var ledger = DailyUsageLedger(day: day)
-        ledger.recordShieldImpression(for: TestFixtures.app)
-        ledger.recordAccessGranted(for: TestFixtures.app)
+        ledger.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        ledger.recordAccessGranted(for: TestFixtures.app, hour: 9)
         var other = DailyUsageLedger(day: day)
-        other.recordShieldImpression(for: TestFixtures.app)
-        other.recordShieldImpression(for: TestFixtures.site)
-        other.recordShieldImpression(for: nil)
+        other.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        other.recordShieldImpression(for: TestFixtures.site, hour: 9)
+        other.recordShieldImpression(for: nil, hour: 14)
 
         ledger.add(other)
         ledger.add(DailyUsageLedger(day: day.adding(days: 1, calendar: calendar)))
@@ -82,16 +85,33 @@ final class DailyUsageLedgerTests: XCTestCase {
         XCTAssertEqual(ledger.totals, BlockStatistics(shieldImpressions: 4, accessesGranted: 1))
         XCTAssertEqual(ledger.statisticsByTarget[TestFixtures.app], BlockStatistics(shieldImpressions: 2, accessesGranted: 1))
         XCTAssertEqual(ledger.statisticsByTarget[TestFixtures.site], BlockStatistics(shieldImpressions: 1, accessesGranted: 0))
+        XCTAssertEqual(ledger.statisticsByHour, [
+            9: BlockStatistics(shieldImpressions: 3, accessesGranted: 1),
+            14: BlockStatistics(shieldImpressions: 1, accessesGranted: 0),
+        ])
+    }
+
+    func testLedgerWrittenBeforeHoursWereCountedDecodesWithNoHours() throws {
+        var ledger = DailyUsageLedger(day: DayKey(year: 2026, month: 10, day: 24))
+        ledger.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(ledger)) as? [String: Any])
+        XCTAssertNotNil(json.removeValue(forKey: "statisticsByHour"))
+
+        let decoded = try JSONDecoder().decode(DailyUsageLedger.self, from: JSONSerialization.data(withJSONObject: json))
+
+        XCTAssertEqual(decoded.totals, BlockStatistics(shieldImpressions: 1))
+        XCTAssertEqual(decoded.statisticsByTarget[TestFixtures.app], BlockStatistics(shieldImpressions: 1))
+        XCTAssertEqual(decoded.statisticsByHour, [:])
     }
 
     func testHistoryMergeSumsTheSameDayAndPrunesToNinetyDays() {
         let today = DayKey(year: 2026, month: 10, day: 25)
         let yesterday = today.adding(days: -1, calendar: calendar)
         var rolledOver = DailyUsageLedger(day: yesterday)
-        rolledOver.recordShieldImpression(for: TestFixtures.app)
-        rolledOver.recordShieldImpression(for: TestFixtures.app)
+        rolledOver.recordShieldImpression(for: TestFixtures.app, hour: 9)
+        rolledOver.recordShieldImpression(for: TestFixtures.app, hour: 9)
         var lateImpression = DailyUsageLedger(day: yesterday)
-        lateImpression.recordShieldImpression(for: TestFixtures.app)
+        lateImpression.recordShieldImpression(for: TestFixtures.app, hour: 9)
 
         var history = UsageHistory(ledgers: [rolledOver, DailyUsageLedger(day: today.adding(days: -95, calendar: calendar))])
         history.merge([lateImpression])
@@ -106,7 +126,7 @@ final class DailyUsageLedgerTests: XCTestCase {
         var state = NotimeState()
         let today = DayKey(year: 2026, month: 10, day: 25)
         for offset in 0..<20 {
-            state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar))
+            state.recordShieldImpression(for: nil, on: today.adding(days: -offset, calendar: calendar), hour: nil)
         }
         state.pruneLedgers(today: today, calendar: calendar, keepingDays: DailyUsageLedger.extensionRetainedDayCount)
         XCTAssertEqual(state.ledgers.map(\.day), (0..<8).reversed().map { today.adding(days: -$0, calendar: calendar) })

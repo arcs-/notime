@@ -50,9 +50,11 @@ light and dark; the extension never reads traits itself. The icon is a grey shie
 
 ```
 notime
-Blocked. Opened 2× today.
+Nothing better to do? Opened 2× today.
 [ Open for 12 min ]
 ```
+
+Before the first opening of the day the body is just "Nothing better to do?".
 
 - The one button opens the app or site for the access length from Settings (default 12 min).
 - The first tap does not open. It starts the wait for this opening and the shield says, for
@@ -62,8 +64,10 @@ Blocked. Opened 2× today.
   finds the target unshielded and shows the app.
 - There is no Close button; swipe home to leave.
 - "Blocks shown" is counted when the shield is rendered: in `state.json` if possible,
-  otherwise in the app group's shared `UserDefaults` (`impressions.<day>.<target>`,
+  otherwise in the app group's shared `UserDefaults` (`impressions.<day>-<hour>.<target>`,
   `lastImpression.<target>`), which the app's reconcile and every tap fold into `state.json`.
+  Each day's counts are also kept per local hour; older entries without an hour still count
+  in their day, just not in any hour.
   On some devices the shield process can save neither, so every tap on "Open" also counts one
   impression for that app or site, unless one was already counted for it in the last 30 s.
   The re-renders the system asks for after a tap (`.defer`) are not counted: a render is
@@ -156,9 +160,10 @@ category notice when categories are selected), **Settings** (the three rows abov
 a number field), **Today** (blocks shown, times opened, and a link to Stats), and the
 "Made by Patrick" link.
 
-**Stats** has a full-width period picker, a bar chart of blocks shown per day (the last 7 days
-for "Today" and "Last 7 days", the last 30 for "All time"; counts are kept per day, so there
-is no hourly chart), the totals, and a list per app or website.
+**Stats** has a full-width period picker, a bar chart with blocks shown and times opened side
+by side (today's 24 hours for "Today", the last 7 days for "Last 7 days", the last 30 days for
+"All time", whose totals still cover all 90 days kept), the totals, and a list per app or
+website.
 
 ## App icon
 

@@ -23,21 +23,13 @@ struct StatsView: View {
                 .listRowBackground(Color.clear)
             }
             Section {
-                ShieldImpressionsChart(
-                    points: UsageReport.dailyShieldImpressions(
-                        ledgers: ledgers,
-                        dayCount: period.chartDayCount,
-                        today: model.today,
-                        calendar: model.calendar
-                    ),
-                    calendar: model.calendar
-                )
-                .padding(.vertical, 8)
+                chart
+                    .padding(.vertical, 8)
             } header: {
-                Text("Blocks shown per day")
+                Text(chartTitle)
             } footer: {
-                if period == .today {
-                    Text("Counts are kept per day, so the chart shows the last 7 days.")
+                if period == .allTime {
+                    Text("Counts are kept for 90 days.")
                 }
             }
             Section("Total") {
@@ -65,5 +57,28 @@ struct StatsView: View {
         .listSectionSpacing(20)
         .navigationTitle("Stats")
         .onAppear { ledgers = model.statisticsLedgers() }
+    }
+
+    private var chart: UsageChart {
+        switch period.chartSpan {
+        case .hoursOfToday:
+            UsageChart.hourly(
+                UsageReport.hourlyStatistics(for: ledgers.first { $0.day == model.today }),
+                of: model.today,
+                calendar: model.calendar
+            )
+        case .days(let dayCount):
+            UsageChart.daily(
+                UsageReport.dailyStatistics(ledgers: ledgers, dayCount: dayCount, today: model.today, calendar: model.calendar),
+                calendar: model.calendar
+            )
+        }
+    }
+
+    private var chartTitle: String {
+        switch period.chartSpan {
+        case .hoursOfToday: "Today, by hour"
+        case .days(let dayCount): "Last \(dayCount) days, per day"
+        }
     }
 }

@@ -31,7 +31,7 @@ public struct ShieldPresentation: Hashable, Sendable {
             body = "wait \(WaitCalculator.describe(seconds: remaining))"
         } else {
             let openedToday = state.ledger(for: DayKey(now, calendar: calendar)).accessCount(for: target)
-            body = "Blocked. Opened \(openedToday)× today."
+            body = openedToday == 0 ? "Nothing better to do?" : "Nothing better to do? Opened \(openedToday)× today."
         }
         return offeringAccess(body: body, policy: state.policy)
     }
