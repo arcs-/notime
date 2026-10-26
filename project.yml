@@ -15,7 +15,6 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
-    TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEAD_CODE_STRIPPING: YES
 
@@ -58,6 +57,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime
+        TARGETED_DEVICE_FAMILY: "1"
         PRODUCT_NAME: notime
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
@@ -91,6 +91,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.shieldconfiguration
+        TARGETED_DEVICE_FAMILY: "1"
         APPLICATION_EXTENSION_API_ONLY: YES
 
   notime-shield-action:
@@ -121,6 +122,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.shieldaction
+        TARGETED_DEVICE_FAMILY: "1"
         APPLICATION_EXTENSION_API_ONLY: YES
 
   notime-monitor:
@@ -151,6 +153,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.monitor
+        TARGETED_DEVICE_FAMILY: "1"
         APPLICATION_EXTENSION_API_ONLY: YES
 
 schemes:

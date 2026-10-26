@@ -20,6 +20,3 @@ notime is not directed at children and does not knowingly collect information fr
 
 If this policy ever changes, the new version will be published at this address with an updated date.
 
-## Contact
-
-Patrick Stillhart, patrick@stillh.art
