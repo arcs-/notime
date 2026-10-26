@@ -1,0 +1,167 @@
+name: notime
+
+options:
+  bundleIdPrefix: art.stillh
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 9N835NTB67
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  NotimeCore:
+    path: Packages/NotimeCore
+
+targets:
+  notime:
+    type: application
+    platform: iOS
+    sources:
+      - path: Notime
+      - path: Shared/ShieldMark.xcassets
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: NotimeCore
+      - target: notime-shield
+      - target: notime-shield-action
+      - target: notime-monitor
+    info:
+      path: Config/notime-Info.plist
+      properties:
+        CFBundleDisplayName: notime
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Config/notime.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.art.stillh.notime
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime
+        PRODUCT_NAME: notime
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  notime-shield:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/NotimeShieldConfiguration
+      - path: Shared/ShieldMark.xcassets
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: NotimeCore
+      - sdk: ManagedSettings.framework
+      - sdk: ManagedSettingsUI.framework
+    info:
+      path: Config/notime-shield-Info.plist
+      properties:
+        CFBundleDisplayName: notime shield
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
+    entitlements:
+      path: Config/notime-shield.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.art.stillh.notime
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.shieldconfiguration
+        APPLICATION_EXTENSION_API_ONLY: YES
+
+  notime-shield-action:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/NotimeShieldAction
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: NotimeCore
+      - sdk: ManagedSettings.framework
+    info:
+      path: Config/notime-shield-action-Info.plist
+      properties:
+        CFBundleDisplayName: notime shield action
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
+    entitlements:
+      path: Config/notime-shield-action.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.art.stillh.notime
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.shieldaction
+        APPLICATION_EXTENSION_API_ONLY: YES
+
+  notime-monitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/NotimeMonitor
+      - path: Config/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: NotimeCore
+      - sdk: DeviceActivity.framework
+    info:
+      path: Config/notime-monitor-Info.plist
+      properties:
+        CFBundleDisplayName: notime monitor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
+    entitlements:
+      path: Config/notime-monitor.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.art.stillh.notime
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: art.stillh.notime.monitor
+        APPLICATION_EXTENSION_API_ONLY: YES
+
+schemes:
+  notime:
+    build:
+      targets:
+        notime: all
+        notime-shield: all
+        notime-shield-action: all
+        notime-monitor: all
+    run:
+      config: Debug
+    archive:
+      config: Release
