@@ -9,9 +9,9 @@ struct OnboardingView: View {
     var body: some View {
         IntroScreen(
             heading: "notime",
-            description: "notime blocks the apps and sites you choose. When you open one, you wait a moment before it lets you in.\n\nTo block them, notime needs Screen Time access. It never sees which apps or sites you pick, and nothing leaves your phone.",
+            description: "notime uses Screen Time to block the apps and websites you choose. Your choices stay on this iPhone, and notime cannot see which apps or sites they are.",
             buttonTitle: "Continue",
-            buttonHint: "Shows the system request for Screen Time access.",
+            buttonHint: "Shows the Screen Time permission request.",
             isButtonDisabled: isRequesting,
             notice: notice
         ) {
