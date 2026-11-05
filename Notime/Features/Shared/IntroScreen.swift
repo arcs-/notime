@@ -40,7 +40,9 @@ struct IntroScreen: View {
                 }
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
-                .padding(.vertical, 16)
+                .padding(.top, 16)
+                // Extra space below lifts the content above the true centre, which reads as centred.
+                .padding(.bottom, 16 + proxy.size.height * 0.12)
                 .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
             }
         }
