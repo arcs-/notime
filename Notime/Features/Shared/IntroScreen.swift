@@ -16,12 +16,16 @@ struct IntroScreen: View {
     var body: some View {
         GeometryReader { proxy in
             ScrollView {
-                VStack(spacing: 20) {
-                    AppMark()
-                    Text(heading)
-                        .font(.largeTitle.bold())
-                        .accessibilityAddTraits(.isHeader)
+                VStack(spacing: 0) {
+                    VStack(spacing: 12) {
+                        AppMark()
+                        Text(heading)
+                            .font(.largeTitle.bold())
+                            .accessibilityAddTraits(.isHeader)
+                    }
                     Text(description)
+                        .padding(.top, 40)
+                        .padding(.bottom, 32)
                     Button(action: action) {
                         Text(buttonTitle)
                             .frame(maxWidth: .infinity, minHeight: 40)
@@ -31,6 +35,7 @@ struct IntroScreen: View {
                     .disabled(isButtonDisabled)
                     if let notice {
                         Text(notice)
+                            .padding(.top, 20)
                     }
                 }
                 .multilineTextAlignment(.center)
