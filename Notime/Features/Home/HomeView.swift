@@ -58,7 +58,7 @@ struct HomeView: View {
     private var authorizationNotice: some View {
         Section {
             Text("Screen Time access is off. notime cannot block anything until you allow it again. Your settings are kept.")
-            Button("Allow Screen Time access") {
+            Button("Continue") {
                 Task { await model.requestAuthorization() }
             }
             .accessibilityHint("Shows the system request for Screen Time access.")

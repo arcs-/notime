@@ -10,7 +10,7 @@ struct OnboardingView: View {
         IntroScreen(
             heading: "notime",
             description: "notime blocks the apps and sites you choose. It needs Screen Time access to do that.",
-            buttonTitle: model.authorizationStatus == .denied ? "Try again" : "Allow Screen Time access",
+            buttonTitle: "Continue",
             buttonHint: "Shows the system request for Screen Time access.",
             isButtonDisabled: isRequesting,
             notice: notice
